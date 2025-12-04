@@ -1,6 +1,6 @@
+# configuration file for building snapshots and releases with jitpack.io
 jdk:
   - openjdk11
 before_install:
-  - ./gradlew clean
-install:
-  - ./gradlew :ucrop:install -x test -x lint -x installDebugAndroidTest -x installReleaseAndroidTest
+  - sdk install java 11.0.10-open
+  - sdk use java 11.0.10-open
