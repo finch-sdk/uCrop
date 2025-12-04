@@ -3,4 +3,4 @@ jdk:
 before_install:
   - ./gradlew clean
 install:
-  - ./gradlew :ucrop:install -x test -x lint
+  - ./gradlew :ucrop:uploadArchives -x test -x lint -x androidTest
