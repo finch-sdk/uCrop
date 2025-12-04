@@ -278,6 +278,9 @@ public class UCrop {
 
         public static final String EXTRA_UCROP_ROOT_VIEW_BACKGROUND_COLOR = EXTRA_PREFIX + ".UcropRootViewBackgroundColor";
 
+        public static final String EXTRA_LOCALE_LANGUAGE = EXTRA_PREFIX + ".LocaleLanguage";
+        public static final String EXTRA_LOCALE_COUNTRY = EXTRA_PREFIX + ".LocaleCountry";
+
 
         private final Bundle mOptionBundle;
 
@@ -535,6 +538,22 @@ public class UCrop {
             mOptionBundle.putInt(EXTRA_MAX_SIZE_Y, height);
         }
 
+        /**
+         * Set locale language for uCrop Activity.
+         * This will override the system default language for the cropping interface.
+         *
+         * @param language language code (e.g., "zh", "en", "ja", "ko")
+         * @param country  country code (e.g., "TW", "CN", "US"). Can be null or empty.
+         */
+        public void setLocale(@NonNull String language, @Nullable String country) {
+            mOptionBundle.putString(EXTRA_LOCALE_LANGUAGE, language);
+            if (country != null && !country.isEmpty()) {
+                mOptionBundle.putString(EXTRA_LOCALE_COUNTRY, country);
+            } else {
+                // Explicitly remove country value to avoid using previously set country
+                mOptionBundle.remove(EXTRA_LOCALE_COUNTRY);
+            }
+        }
     }
 
 }

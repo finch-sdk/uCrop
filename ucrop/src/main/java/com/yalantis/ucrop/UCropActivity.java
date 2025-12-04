@@ -1,8 +1,10 @@
 package com.yalantis.ucrop;
 
-import android.annotation.TargetApi;
+import android.content.Context;
 import android.content.Intent;
+import android.content.res.Configuration;
 import android.graphics.Bitmap;
+import android.graphics.Color;
 import android.graphics.PorterDuff;
 import android.graphics.drawable.Animatable;
 import android.graphics.drawable.Drawable;
@@ -16,14 +18,30 @@ import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
-import android.view.Window;
-import android.view.WindowManager;
 import android.view.animation.AccelerateInterpolator;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.RelativeLayout;
 import android.widget.TextView;
+
+import android.view.Window;
+import androidx.annotation.ColorInt;
+import androidx.annotation.DrawableRes;
+import androidx.annotation.IdRes;
+import androidx.annotation.IntDef;
+import androidx.annotation.NonNull;
+import androidx.appcompat.app.ActionBar;
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.appcompat.app.AppCompatDelegate;
+import androidx.appcompat.widget.Toolbar;
+import androidx.core.content.ContextCompat;
+import androidx.core.graphics.Insets;
+import androidx.core.view.ViewCompat;
+import androidx.core.view.WindowInsetsCompat;
+import androidx.transition.AutoTransition;
+import androidx.transition.Transition;
+import androidx.transition.TransitionManager;
 
 import com.yalantis.ucrop.callback.BitmapCropCallback;
 import com.yalantis.ucrop.model.AspectRatio;
@@ -41,20 +59,6 @@ import java.lang.annotation.RetentionPolicy;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
-
-import androidx.annotation.ColorInt;
-import androidx.annotation.DrawableRes;
-import androidx.annotation.IdRes;
-import androidx.annotation.IntDef;
-import androidx.annotation.NonNull;
-import androidx.appcompat.app.ActionBar;
-import androidx.appcompat.app.AppCompatActivity;
-import androidx.appcompat.app.AppCompatDelegate;
-import androidx.appcompat.widget.Toolbar;
-import androidx.core.content.ContextCompat;
-import androidx.transition.AutoTransition;
-import androidx.transition.Transition;
-import androidx.transition.TransitionManager;
 
 /**
  * Created by Oleksii Shliama (https://github.com/shliama).
@@ -87,7 +91,6 @@ public class UCropActivity extends AppCompatActivity {
 
     // Enables dynamic coloring
     private int mToolbarColor;
-    private int mStatusBarColor;
     private int mActiveControlsWidgetColor;
     private int mToolbarWidgetColor;
     @ColorInt
@@ -122,11 +125,13 @@ public class UCropActivity extends AppCompatActivity {
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
+        setLocaleFromIntent();
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.ucrop_activity_photobox);
 
         final Intent intent = getIntent();
 
+        setupSystemBars(intent);
+        setContentView(R.layout.ucrop_activity_photobox);
         setupViews(intent);
         setImageData(intent);
         setInitialState();
@@ -188,6 +193,28 @@ public class UCropActivity extends AppCompatActivity {
         if (mGestureCropImageView != null) {
             mGestureCropImageView.cancelAllAnimations();
         }
+    }
+
+    @Override
+    protected void attachBaseContext(Context newBase) {
+        Context context = newBase;
+        try {
+            Intent intent = null;
+            if (newBase instanceof android.app.Activity) {
+                android.app.Activity activity = (android.app.Activity) newBase;
+                intent = activity.getIntent();
+            }
+            if (intent != null) {
+                Locale locale = getLocaleFromIntent(intent);
+                if (locale != null) {
+                    context = applyLocaleToContext(newBase, locale);
+                    Log.d(TAG, "Language set in attachBaseContext: " + locale.toString());
+                }
+            }
+        } catch (Exception e) {
+            Log.d(TAG, "Could not set language in attachBaseContext, will set in onCreate: " + e.getMessage());
+        }
+        super.attachBaseContext(context);
     }
 
     /**
@@ -252,6 +279,7 @@ public class UCropActivity extends AppCompatActivity {
         mOverlayView.setCropGridRowCount(intent.getIntExtra(UCrop.Options.EXTRA_CROP_GRID_ROW_COUNT, OverlayView.DEFAULT_CROP_GRID_ROW_COUNT));
         mOverlayView.setCropGridColumnCount(intent.getIntExtra(UCrop.Options.EXTRA_CROP_GRID_COLUMN_COUNT, OverlayView.DEFAULT_CROP_GRID_COLUMN_COUNT));
         mOverlayView.setCropGridColor(intent.getIntExtra(UCrop.Options.EXTRA_CROP_GRID_COLOR, getResources().getColor(R.color.ucrop_color_default_crop_grid)));
+        // setCropGridCornerColor method not available in version 2.2.8, removed
         mOverlayView.setCropGridStrokeWidth(intent.getIntExtra(UCrop.Options.EXTRA_CROP_GRID_STROKE_WIDTH, getResources().getDimensionPixelSize(R.dimen.ucrop_default_crop_grid_stoke_width)));
 
         // Aspect ratio options
@@ -284,8 +312,42 @@ public class UCropActivity extends AppCompatActivity {
         }
     }
 
+    private void setupSystemBars(@NonNull Intent intent) {
+        // EXTRA_STATUS_BAR_LIGHT and EXTRA_NAVIGATION_BAR_LIGHT not available in version 2.2.8
+        // Using default values: light status bar, dark navigation bar
+        boolean statusBarLight = true;
+        boolean navigationBarLight = false;
+
+        // Use traditional method to set system bars, compatible with compileSdkVersion 33
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            Window window = getWindow();
+            View decorView = window.getDecorView();
+            
+            int flags = decorView.getSystemUiVisibility();
+            
+            // Set status bar style
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                if (statusBarLight) {
+                    flags |= View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR;
+                } else {
+                    flags &= ~View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR;
+                }
+            }
+            
+            // Set navigation bar style
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                if (navigationBarLight) {
+                    flags |= View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR;
+                } else {
+                    flags &= ~View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR;
+                }
+            }
+            
+            decorView.setSystemUiVisibility(flags);
+        }
+    }
+
     private void setupViews(@NonNull Intent intent) {
-        mStatusBarColor = intent.getIntExtra(UCrop.Options.EXTRA_STATUS_BAR_COLOR, ContextCompat.getColor(this, R.color.ucrop_color_statusbar));
         mToolbarColor = intent.getIntExtra(UCrop.Options.EXTRA_TOOL_BAR_COLOR, ContextCompat.getColor(this, R.color.ucrop_color_toolbar));
         mActiveControlsWidgetColor = intent.getIntExtra(UCrop.Options.EXTRA_UCROP_COLOR_CONTROLS_WIDGET_ACTIVE, ContextCompat.getColor(this, R.color.ucrop_color_active_controls_color));
 
@@ -322,6 +384,19 @@ public class UCropActivity extends AppCompatActivity {
             mLayoutRotate = findViewById(R.id.layout_rotate_wheel);
             mLayoutScale = findViewById(R.id.layout_scale_wheel);
 
+            View controlsWrapper = findViewById(R.id.controls_wrapper);
+            int wrapperStatesHeight = getResources().getDimensionPixelSize(R.dimen.ucrop_height_wrapper_states);
+            ViewCompat.setOnApplyWindowInsetsListener(controlsWrapper.findViewById(R.id.wrapper_states), (view, windowInsets) -> {
+                Insets insets = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars());
+                view.setPaddingRelative(insets.left, 0, insets.right, insets.bottom);
+                ViewGroup.LayoutParams layoutParams = view.getLayoutParams();
+                int newWrapperStatesHeight = wrapperStatesHeight + insets.bottom;
+                if (layoutParams.height != newWrapperStatesHeight) {
+                    layoutParams.height = newWrapperStatesHeight;
+                    view.setLayoutParams(layoutParams);
+                }
+                return windowInsets;
+            });
             setupAspectRatioWidget(intent);
             setupRotateWidget();
             setupScaleWidget();
@@ -333,9 +408,13 @@ public class UCropActivity extends AppCompatActivity {
      * Configures and styles both status bar and toolbar.
      */
     private void setupAppBar() {
-        setStatusBarColor(mStatusBarColor);
-
         final Toolbar toolbar = findViewById(R.id.toolbar);
+
+        ViewCompat.setOnApplyWindowInsetsListener(toolbar, (view, windowInsets) -> {
+            Insets insets = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars());
+            view.setPaddingRelative(insets.left, insets.top, insets.right, 0);
+            return windowInsets;
+        });
 
         // Set all of the Toolbar coloring
         toolbar.setBackgroundColor(mToolbarColor);
@@ -412,23 +491,6 @@ public class UCropActivity extends AppCompatActivity {
         stateScaleImageView.setImageDrawable(new SelectedStateListDrawable(stateScaleImageView.getDrawable(), mActiveControlsWidgetColor));
         stateRotateImageView.setImageDrawable(new SelectedStateListDrawable(stateRotateImageView.getDrawable(), mActiveControlsWidgetColor));
         stateAspectRatioImageView.setImageDrawable(new SelectedStateListDrawable(stateAspectRatioImageView.getDrawable(), mActiveControlsWidgetColor));
-    }
-
-
-    /**
-     * Sets status-bar color for L devices.
-     *
-     * @param color - status-bar color
-     */
-    @TargetApi(Build.VERSION_CODES.LOLLIPOP)
-    private void setStatusBarColor(@ColorInt int color) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-            final Window window = getWindow();
-            if (window != null) {
-                window.addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS);
-                window.setStatusBarColor(color);
-            }
-        }
     }
 
     private void setupAspectRatioWidget(@NonNull Intent intent) {
@@ -519,7 +581,6 @@ public class UCropActivity extends AppCompatActivity {
                 rotateByAngle(90);
             }
         });
-
         setAngleTextColor(mActiveControlsWidgetColor);
     }
 
@@ -555,7 +616,8 @@ public class UCropActivity extends AppCompatActivity {
 
     private void setAngleText(float angle) {
         if (mTextViewRotateAngle != null) {
-            mTextViewRotateAngle.setText(String.format(Locale.getDefault(), "%.1f°", angle));
+            Locale locale = getCurrentLocale();
+            mTextViewRotateAngle.setText(String.format(locale, "%.1f°", angle));
         }
     }
 
@@ -567,7 +629,8 @@ public class UCropActivity extends AppCompatActivity {
 
     private void setScaleText(float scale) {
         if (mTextViewScalePercent != null) {
-            mTextViewScalePercent.setText(String.format(Locale.getDefault(), "%d%%", (int) (scale * 100)));
+            Locale locale = getCurrentLocale();
+            mTextViewScalePercent.setText(String.format(locale, "%d%%", (int) (scale * 100)));
         }
     }
 
@@ -697,4 +760,99 @@ public class UCropActivity extends AppCompatActivity {
         setResult(UCrop.RESULT_ERROR, new Intent().putExtra(UCrop.EXTRA_ERROR, throwable));
     }
 
+    /**
+     * Read language settings from Intent and apply them
+     * This method is called in onCreate when Intent is ready
+     */
+    private void setLocaleFromIntent() {
+        Intent intent = getIntent();
+        if (intent == null) {
+            return;
+        }
+
+        Locale locale = getLocaleFromIntent(intent);
+        if (locale != null) {
+            applyLocaleToActivity(locale);
+            Log.d(TAG, "Language set to: " + locale.toString());
+        }
+    }
+
+    /**
+     * Extract language settings from Intent and create Locale object
+     * 
+     * @param intent Intent object
+     * @return Locale object, or null if language is not set
+     */
+    private Locale getLocaleFromIntent(Intent intent) {
+        String language = intent.getStringExtra(UCrop.Options.EXTRA_LOCALE_LANGUAGE);
+        String country = intent.getStringExtra(UCrop.Options.EXTRA_LOCALE_COUNTRY);
+
+        if (language == null || language.isEmpty()) {
+            return null;
+        }
+
+        if (country != null && !country.isEmpty()) {
+            return new Locale(language, country);
+        } else {
+            return new Locale(language);
+        }
+    }
+
+    /**
+     * Apply Locale to Context (for attachBaseContext)
+     * 
+     * @param context Original Context
+     * @param locale Locale object
+     * @return New Context with Locale applied (Android 7.0+) or original Context
+     */
+    private Context applyLocaleToContext(Context context, Locale locale) {
+        Configuration config = context.getResources().getConfiguration();
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            config.setLocale(locale);
+            Locale.setDefault(locale);
+            return context.createConfigurationContext(config);
+        } else {
+            config.locale = locale;
+            context.getResources().updateConfiguration(config, context.getResources().getDisplayMetrics());
+            Locale.setDefault(locale);
+            return context;
+        }
+    }
+
+    /**
+     * Apply Locale to current Activity (for onCreate)
+     * 
+     * @param locale Locale object
+     */
+    private void applyLocaleToActivity(Locale locale) {
+        Configuration config = getResources().getConfiguration();
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            config.setLocale(locale);
+            getResources().updateConfiguration(config, getResources().getDisplayMetrics());
+        } else {
+            config.locale = locale;
+            getResources().updateConfiguration(config, getResources().getDisplayMetrics());
+        }
+        Locale.setDefault(locale);
+    }
+
+    /**
+     * Get current Locale
+     * Prefer locale from configuration, fallback to system default if not set
+     */
+    private Locale getCurrentLocale() {
+        Configuration config = getResources().getConfiguration();
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            // Android 7.0+ use getLocales()
+            if (config.getLocales() != null && !config.getLocales().isEmpty()) {
+                return config.getLocales().get(0);
+            }
+        } else {
+            // Android 7.0 and below use locale
+            if (config.locale != null) {
+                return config.locale;
+            }
+        }
+        return Locale.getDefault();
+    }
 }
