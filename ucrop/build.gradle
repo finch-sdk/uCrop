@@ -1,6 +1,9 @@
 apply plugin: 'com.android.library'
 apply from: '../mavenpush.gradle'
 
+
+// Set archivesBaseName to ensure JitPack uses lowercase artifactId
+archivesBaseName = 'ucrop'
 android {
     compileSdkVersion 31
     buildToolsVersion '30.0.2'
